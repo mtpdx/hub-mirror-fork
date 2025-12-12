@@ -55,6 +55,38 @@ jobs:
               repo: context.repo.repo,
               body: body
             })
+
+            try {
+              const cusregdata = fs.readFileSync('cusreg.sh', 'utf8')
+              const cusregbody = 
+                  "```shell\n" +
+                  cusregdata +
+                  "```\n" +
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: cusregbody
+              })
+            } catch (error) {
+              console.log("failed to add custom registry comment")
+            }
+
+            try {
+              const nerdctlshdata = fs.readFileSync('nerdctl.sh', 'utf8')
+              const nerdctlshbody = 
+                  "```shell\n" +
+                  nerdctlshdata +
+                  "```\n" +
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: nerdctlshbody
+              })
+            } catch (error) {
+              console.log("failed to add nerdctl.sh comment")
+            }
       # 5. 当以上步骤成功时，为 issues 添加 success 标签
       - name: Success issues
         if: ${{ success() }}
