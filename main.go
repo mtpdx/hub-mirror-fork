@@ -17,11 +17,13 @@ import (
 )
 
 var (
-	content    = pflag.StringP("content", "", "", "原始镜像，格式为：{ \"hub-mirror\": [] }")
-	maxContent = pflag.IntP("maxContent", "", 10, "原始镜像个数限制")
-	username   = pflag.StringP("username", "", "", "docker hub 用户名")
-	password   = pflag.StringP("password", "", "", "docker hub 密码")
-	outputPath = pflag.StringP("outputPath", "", "output.sh", "结果输出路径")
+	content            = pflag.StringP("content", "", "", "原始镜像，格式为：{ \"hub-mirror\": [] }")
+	maxContent         = pflag.IntP("maxContent", "", 10, "原始镜像个数限制")
+	username           = pflag.StringP("username", "", "", "docker hub 用户名")
+	password           = pflag.StringP("password", "", "", "docker hub 密码")
+	outputPath         = pflag.StringP("outputPath", "", "output.sh", "结果输出路径")
+	customRegistryPath = pflag.StringP("customRegistryPath", "", "cusreg.sh", "自定义镜像仓库结果输出路径")
+	nerdctlPath        = pflag.StringP("nerdctlPath", "", "nerdctl.sh", "nerdctl 命令结果输出路径")
 )
 
 func main() {
@@ -30,8 +32,8 @@ func main() {
 	fmt.Println("验证原始镜像内容")
 	var hubMirrors struct {
 		Content []string `json:"hub-mirror"`
-		// tag时如果镜像后缀是sha256时，使用version替代
-		Version string `json:"version"`
+		// CustomRegistry 自定义镜像仓库
+		CustomRegistry string `json:"custom-registry"`
 	}
 	err := json.Unmarshal([]byte(*content), &hubMirrors)
 	if err != nil {
@@ -73,23 +75,19 @@ func main() {
 	}, 0)
 
 	wg := sync.WaitGroup{}
-	
-	if hubMirrors.Version == "" {
-		hubMirrors.Version = "latest"
-	}
 
 	for _, source := range hubMirrors.Content {
 		if source == "" {
 			continue
 		}
-		
+
 		index := strings.Index(source, "@sha256")
 		var target string
 		if index != -1 {
-			runes := []rune(source)
-			safeSubstring := string(runes[0:index])
-			target = *username + "/" + strings.ReplaceAll(safeSubstring, "/", ".") + ":" + hubMirrors.Version
-		}else {
+			// 去除 @sha256，将后面的 hash 作为 tag
+			cleaned := strings.Replace(source, "@sha256", "", 1)
+			target = *username + "/" + strings.ReplaceAll(cleaned, "/", ".")
+		} else {
 			target = *username + "/" + strings.ReplaceAll(source, "/", ".")
 		}
 
@@ -138,24 +136,115 @@ func main() {
 		panic("output is empty.")
 	}
 
-	tmpl, err := template.New("pull_images").Parse(`{{- range . -}}
-
-docker pull {{ .Target }}
-docker tag {{ .Target }} {{ .Source }}
-docker tag {{ .Target }} xx-registry/{{ .Source }}
-
-{{ end -}}`)
-	if err != nil {
-		panic(err)
-	}
+	// 创建基础输出文件（docker pull 和 docker tag）
 	outputFile, err := os.Create(*outputPath)
 	if err != nil {
 		panic(err)
 	}
 	defer outputFile.Close()
+
+	// 基础模板：docker pull 和 docker tag
+	tmpl, err := template.New("pull_images").Parse(`{{- range . -}}
+
+docker pull {{ .Target }}
+docker tag {{ .Target }} {{ .Source }}
+
+{{ end -}}`)
+	if err != nil {
+		panic(err)
+	}
 	err = tmpl.Execute(outputFile, output)
 	if err != nil {
 		panic(err)
 	}
+
+	// 如果 CustomRegistry 不为空，创建自定义仓库文件
+	if hubMirrors.CustomRegistry != "" {
+		// 创建包含 CustomRegistry 的数据结构
+		type CustomData struct {
+			Output []struct {
+				Source string
+				Target string
+			}
+			CustomRegistry string
+		}
+		customData := CustomData{
+			Output:         output,
+			CustomRegistry: hubMirrors.CustomRegistry,
+		}
+
+		// 创建自定义仓库输出文件
+		customRegistryFile, err := os.Create(*customRegistryPath)
+		if err != nil {
+			panic(err)
+		}
+		defer customRegistryFile.Close()
+
+		// 自定义仓库模板
+		customTmpl, err := template.New("custom_registry").Parse(`{{- range .Output -}}
+
+docker tag {{ .Target }} {{ $.CustomRegistry }}/{{ .Source }}
+docker push {{ $.CustomRegistry }}/{{ .Source }}
+
+{{ end -}}`)
+		if err != nil {
+			panic(err)
+		}
+
+		// 执行自定义仓库模板
+		err = customTmpl.Execute(customRegistryFile, customData)
+		if err != nil {
+			panic(err)
+		}
+
+		// 创建 nerdctl 输出文件
+		nerdctlFile, err := os.Create(*nerdctlPath)
+		if err != nil {
+			panic(err)
+		}
+		defer nerdctlFile.Close()
+
+		// nerdctl 模板
+		nerdctlTmpl, err := template.New("nerdctl").Parse(`{{- range .Output -}}
+
+nerdctl -n k8s.io pull {{ $.CustomRegistry }}/{{ .Source }}
+nerdctl -n k8s.io tag {{ $.CustomRegistry }}/{{ .Source }} {{ .Source }}
+
+{{ end -}}`)
+		if err != nil {
+			panic(err)
+		}
+
+		// 执行 nerdctl 模板
+		err = nerdctlTmpl.Execute(nerdctlFile, customData)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		// 创建 nerdctl 输出文件
+		nerdctlFile, err := os.Create(*nerdctlPath)
+		if err != nil {
+			panic(err)
+		}
+		defer nerdctlFile.Close()
+		
+		// nerdctl 模板
+		nerdctlTmpl, err := template.New("nerdctl").Parse(`{{- range .Output -}}
+
+nerdctl -n k8s.io pull {{ .Target }}
+nerdctl -n k8s.io tag {{ .Target }} {{ .Source }}
+
+{{ end -}}`)
+		if err != nil {
+			panic(err)
+		}
+
+		// 执行 nerdctl 模板
+		err = nerdctlTmpl.Execute(nerdctlFile, output)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	fmt.Println(output)
 }
