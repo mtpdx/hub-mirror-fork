@@ -30,7 +30,7 @@ jobs:
         run: go run main.go --username=${{ secrets.DOCKERHUB_USERNAME }} --password=${{ secrets.DOCKERHUB_TOKEN }} --content='${{ github.event.issue.body }}' --maxContent=13 --outputPath=output.sh --customRegistryPath=cusreg.sh --nerdctlPath=nerdctl.sh
       # 4. 当成功输出 output.sh 文件时，为 issues 添加评论
       - name: Add comment
-        if: ${{ hashFiles('output.sh') }}
+        if: ${{ hashFiles('cusreg.sh') }}
         uses: actions/github-script@v5
         with:
           script: |
