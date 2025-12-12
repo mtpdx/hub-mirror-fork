@@ -30,12 +30,15 @@ jobs:
         run: go run main.go --username=${{ secrets.DOCKERHUB_USERNAME }} --password=${{ secrets.DOCKERHUB_TOKEN }} --content='${{ github.event.issue.body }}' --maxContent=13 --outputPath=output.sh --customRegistryPath=cusreg.sh --nerdctlPath=nerdctl.sh
       # 4. 当成功输出 output.sh 文件时，为 issues 添加评论
       - name: Add comment
-        if: ${{ hashFiles('cusreg.sh') }}
+        if: ${{ hashFiles('output.sh') }}
         uses: actions/github-script@v5
         with:
           script: |
             const fs = require('fs')
             const data = fs.readFileSync('output.sh', 'utf8')
+            const cusregdata = fs.readFileSync('cusreg.sh', 'utf8')
+            const nerdctlshdata = fs.readFileSync('nerdctl.sh', 'utf8')
+
             const body = "Hello，您可以直接执行该命令：\n" +
                 "\n" +
                 "```shell\n" +
@@ -57,12 +60,12 @@ jobs:
             })
 
             try {
-              const cusregdata = fs.readFileSync('cusreg.sh', 'utf8')
+              
               const cusregbody = 
                   "```shell\n" +
                   cusregdata +
-                  "```\n" +
-              await github.rest.issues.createComment({
+                  "```\n" 
+              github.rest.issues.createComment({
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -73,12 +76,12 @@ jobs:
             }
 
             try {
-              const nerdctlshdata = fs.readFileSync('nerdctl.sh', 'utf8')
+              
               const nerdctlshbody = 
                   "```shell\n" +
                   nerdctlshdata +
-                  "```\n" +
-              await github.rest.issues.createComment({
+                  "```\n" 
+              github.rest.issues.createComment({
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -128,7 +131,7 @@ jobs:
             const cusregbody = 
                 "```shell\n" +
                 cusregdata +
-                "```\n" +
+                "```\n"
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -146,7 +149,7 @@ jobs:
             const nerdctlshbody = 
                 "```shell\n" +
                 nerdctlshdata +
-                "```\n" +
+                "```\n"
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
