@@ -92,16 +92,16 @@ jobs:
         with:
           script: |
             const fs = require('fs')
-            const data = fs.readFileSync('cusreg.sh', 'utf8')
-            const body = 
+            const cusregdata = fs.readFileSync('cusreg.sh', 'utf8')
+            const cusregbody = 
                 "```shell\n" +
-                data +
+                cusregdata +
                 "```\n" +
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: body
+              body: cusregbody
             })
       # 8. 当成功输出 nerdctl.sh 文件时，为 issues 添加评论
       - name: Add comment
@@ -110,14 +110,14 @@ jobs:
         with:
           script: |
             const fs = require('fs')
-            const data = fs.readFileSync('nerdctl.sh', 'utf8')
-            const body = 
+            const nerdctlshdata = fs.readFileSync('nerdctl.sh', 'utf8')
+            const nerdctlshbody = 
                 "```shell\n" +
-                data +
+                nerdctlshdata +
                 "```\n" +
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: body
+              body: nerdctlshbody
             })
