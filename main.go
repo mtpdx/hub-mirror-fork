@@ -86,7 +86,6 @@ func main() {
 		if index != -1 {
 			// 去除 @sha256，将后面的 hash 作为 tag
 			cleaned := strings.Replace(source, "@sha256", "", 1)
-			source = cleaned
 			target = *username + "/" + strings.ReplaceAll(cleaned, "/", ".")
 		} else {
 			target = *username + "/" + strings.ReplaceAll(source, "/", ".")
@@ -126,7 +125,10 @@ func main() {
 			output = append(output, struct {
 				Source string
 				Target string
-			}{Source: source, Target: target})
+			}{
+				Source: strings.Replace(source, "@sha256", "", 1), 
+				Target: target,
+			})
 			fmt.Println("转换成功", source, "=>", target)
 		}(source, target)
 	}
