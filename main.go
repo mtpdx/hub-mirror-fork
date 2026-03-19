@@ -232,7 +232,7 @@ nerdctl -n k8s.io tag {{ $.CustomRegistry }}/{{ .Source }} {{ .Source }}
 		defer nerdctlFile.Close()
 		
 		// nerdctl 模板
-		nerdctlTmpl, err := template.New("nerdctl").Parse(`{{- range .Output -}}
+		nerdctlTmpl, err := template.New("nerdctl").Parse(`{{- range . -}}
 
 nerdctl -n k8s.io pull {{ .Target }}
 nerdctl -n k8s.io tag {{ .Target }} {{ .Source }}
